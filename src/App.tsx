@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
-import { User, Settings, X, Radio, Lock, Unlock } from 'lucide-react';
+import { User, Settings, X, Radio } from 'lucide-react';
 
 const getSignalingUrl = () => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -22,11 +22,17 @@ const hashFrequency = async (freq: string) => {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 16);
 };
 
-// 3D Waveform
+const haptic = {
+    light: () => navigator.vibrate?.(10),
+    medium: () => navigator.vibrate?.([20, 10, 20]),
+    heavy: () => navigator.vibrate?.(50)
+};
+
+// 3D Waveform - Only animates when connected
 const SiriWaveform = ({ analyser }: { analyser: AnalyserNode | null }) => {
     const meshRef = useRef<THREE.Mesh>(null);
     const geometryRef = useRef<THREE.BufferGeometry>(null);
-
+    
     const barCount = 64;
     const positions = new Float32Array(barCount * 18);
     const dataArray = new Uint8Array(barCount);
@@ -43,27 +49,27 @@ const SiriWaveform = ({ analyser }: { analyser: AnalyserNode | null }) => {
             const width = 0.1;
 
             const idx = i * 18;
-
+            
             positions[idx] = x - width / 2;
             positions[idx + 1] = -height / 2;
             positions[idx + 2] = 0;
-
+            
             positions[idx + 3] = x + width / 2;
             positions[idx + 4] = -height / 2;
             positions[idx + 5] = 0;
-
+            
             positions[idx + 6] = x + width / 2;
             positions[idx + 7] = height / 2;
             positions[idx + 8] = 0;
-
+            
             positions[idx + 9] = x - width / 2;
             positions[idx + 10] = -height / 2;
             positions[idx + 11] = 0;
-
+            
             positions[idx + 12] = x + width / 2;
             positions[idx + 13] = height / 2;
             positions[idx + 14] = 0;
-
+            
             positions[idx + 15] = x - width / 2;
             positions[idx + 16] = height / 2;
             positions[idx + 17] = 0;
@@ -75,8 +81,15 @@ const SiriWaveform = ({ analyser }: { analyser: AnalyserNode | null }) => {
 
     return (
         <mesh ref={meshRef}>
-            <bufferGeometry ref={geometryRef} />
-            <meshStandardMaterial
+            <bufferGeometry ref={geometryRef}>
+                <bufferAttribute
+                    attach="attributes-position"
+                    count={barCount * 6}
+                    array={positions}
+                    itemSize={3}
+                />
+            </bufferGeometry>
+            <meshStandardMaterial 
                 color="#ffffff"
                 roughness={0.3}
                 metalness={0.7}
@@ -89,14 +102,12 @@ const App = () => {
     const [frequency, setFrequency] = useState('104.5');
     const [isConnected, setIsConnected] = useState(false);
     const [isTransmitting, setIsTransmitting] = useState(false);
-    const [isPTTLocked, setIsPTTLocked] = useState(false);
     const [peerCount, setPeerCount] = useState(0);
     const [isSpeaking, setIsSpeaking] = useState(false);
     const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
     const [showPasskey, setShowPasskey] = useState(false);
     const [showSettings, setShowSettings] = useState(false);
     const [passkey, setPasskey] = useState('');
-    const [hapticEnabled, setHapticEnabled] = useState(true);
 
     const wsRef = useRef<WebSocket | null>(null);
     const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -105,12 +116,6 @@ const App = () => {
     const audioContextRef = useRef<AudioContext | null>(null);
     const localAnalyserRef = useRef<AnalyserNode | null>(null);
     const remoteAnalyserRef = useRef<AnalyserNode | null>(null);
-
-    const haptic = {
-        light: () => hapticEnabled && navigator.vibrate?.(10),
-        medium: () => hapticEnabled && navigator.vibrate?.([20, 10, 20]),
-        heavy: () => hapticEnabled && navigator.vibrate?.(50)
-    };
 
     const initAudioEngine = () => {
         if (!audioContextRef.current) {
@@ -146,8 +151,6 @@ const App = () => {
             localStreamRef.current?.getTracks().forEach(t => t.stop());
             setIsConnected(false);
             setPeerCount(0);
-            setIsPTTLocked(false);
-            setIsTransmitting(false);
             haptic.heavy();
             return;
         }
@@ -266,26 +269,12 @@ const App = () => {
     };
 
     const togglePTT = (active: boolean) => {
-        if (isPTTLocked) return;
-
         haptic[active ? 'medium' : 'light']();
         setIsTransmitting(active);
         if (active && audioContextRef.current?.state === 'suspended') {
             audioContextRef.current.resume();
         }
         localStreamRef.current?.getAudioTracks().forEach(t => t.enabled = active);
-    };
-
-    const togglePTTLock = () => {
-        const newLockState = !isPTTLocked;
-        setIsPTTLocked(newLockState);
-        setIsTransmitting(newLockState);
-        haptic.heavy();
-
-        if (newLockState && audioContextRef.current?.state === 'suspended') {
-            audioContextRef.current.resume();
-        }
-        localStreamRef.current?.getAudioTracks().forEach(t => t.enabled = newLockState);
     };
 
     return (
@@ -333,7 +322,7 @@ const App = () => {
                         <Canvas camera={{ position: [0, 0, 8], fov: 50 }}>
                             <ambientLight intensity={0.8} />
                             <pointLight position={[10, 10, 10]} intensity={1} />
-                            <SiriWaveform
+                            <SiriWaveform 
                                 analyser={isTransmitting ? localAnalyserRef.current : remoteAnalyserRef.current}
                             />
                         </Canvas>
@@ -342,7 +331,6 @@ const App = () => {
                                 <div className="px-4 py-2 rounded-full bg-white/10 backdrop-blur-xl text-white text-sm font-medium flex items-center gap-2 border border-white/20">
                                     <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
                                     {isTransmitting ? 'Transmitting' : 'Receiving'}
-                                    {isPTTLocked && <Lock size={12} className="ml-1" />}
                                 </div>
                             </div>
                         )}
@@ -360,43 +348,33 @@ const App = () => {
             {/* Bottom Controls */}
             <div className="absolute bottom-0 left-0 right-0 z-20 pb-safe">
                 <div className="px-8 pb-8">
-                    <div className="flex items-center justify-center gap-4 mb-6">
-                        {isConnected && (
-                            <button
-                                onClick={togglePTTLock}
-                                className={`w-12 h-12 rounded-full flex items-center justify-center transition-all ${isPTTLocked
-                                        ? 'bg-white text-black'
-                                        : 'bg-white/10 text-white border border-white/20'
-                                    }`}
-                            >
-                                {isPTTLocked ? <Lock size={18} /> : <Unlock size={18} />}
-                            </button>
-                        )}
-
+                    <div className="flex items-center justify-center mb-6">
                         <button
                             onTouchStart={() => togglePTT(true)}
                             onTouchEnd={() => togglePTT(false)}
                             onMouseDown={() => togglePTT(true)}
                             onMouseUp={() => togglePTT(false)}
-                            disabled={!isConnected || isPTTLocked}
-                            className={`relative w-24 h-24 transition-all duration-200 ${!isConnected ? 'opacity-30' : isTransmitting ? 'scale-90' : 'scale-100'
-                                } ${isPTTLocked ? 'opacity-50' : ''}`}
+                            disabled={!isConnected}
+                            className={`relative w-24 h-24 transition-all duration-200 ${
+                                !isConnected ? 'opacity-30' : isTransmitting ? 'scale-90' : 'scale-100'
+                            }`}
                         >
-                            <div className={`absolute inset-0 rounded-full border-[5px] ${isConnected ? 'border-white' : 'border-white/30'
-                                }`}></div>
-                            <div className={`absolute inset-[10px] rounded-full ${isTransmitting ? 'bg-white' : isConnected ? 'bg-white' : 'bg-white/20'
-                                }`}></div>
+                            <div className={`absolute inset-0 rounded-full border-[5px] ${
+                                isConnected ? 'border-white' : 'border-white/30'
+                            }`}></div>
+                            <div className={`absolute inset-[10px] rounded-full ${
+                                isTransmitting ? 'bg-white' : isConnected ? 'bg-white' : 'bg-white/20'
+                            }`}></div>
                         </button>
-
-                        {isConnected && <div className="w-12"></div>}
                     </div>
 
                     <button
                         onClick={connectToFrequency}
-                        className={`w-full py-5 rounded-full font-bold text-lg transition-all ${isConnected
-                                ? 'bg-white/10 text-white border-2 border-white/30'
+                        className={`w-full py-5 rounded-full font-bold text-lg transition-all ${
+                            isConnected 
+                                ? 'bg-white/10 text-white border-2 border-white/30' 
                                 : 'bg-white text-black'
-                            }`}
+                        }`}
                     >
                         {isConnected ? 'Disconnect' : 'Connect'}
                     </button>
@@ -425,8 +403,8 @@ const App = () => {
             )}
 
             {showPasskey && (
-                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-lg" onClick={() => setShowPasskey(false)}>
-                    <div className="absolute bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-xl rounded-t-3xl p-6 border-t border-white/10" onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-lg">
+                    <div className="absolute bottom-0 left-0 right-0 bg-zinc-900/95 backdrop-blur-xl rounded-t-3xl p-6 border-t border-white/10">
                         <div className="flex justify-between items-center mb-4">
                             <h3 className="text-2xl font-bold text-white">🔒 Restricted</h3>
                             <button onClick={() => setShowPasskey(false)} className="w-10 h-10 rounded-xl hover:bg-white/10 flex items-center justify-center">
@@ -457,14 +435,9 @@ const App = () => {
                         <div className="space-y-4 mb-6">
                             <div className="flex justify-between items-center py-4 border-b border-white/10">
                                 <span className="text-white text-lg">Haptic Feedback</span>
-                                <button
-                                    onClick={() => setHapticEnabled(!hapticEnabled)}
-                                    className={`w-14 h-7 rounded-full relative transition-all ${hapticEnabled ? 'bg-white' : 'bg-white/20'
-                                        }`}
-                                >
-                                    <div className={`w-6 h-6 bg-black rounded-full absolute top-0.5 transition-all ${hapticEnabled ? 'right-0.5' : 'left-0.5'
-                                        }`}></div>
-                                </button>
+                                <div className="w-14 h-7 bg-white rounded-full relative">
+                                    <div className="w-6 h-6 bg-black rounded-full absolute right-0.5 top-0.5"></div>
+                                </div>
                             </div>
                             <div className="text-sm text-white/40 pt-4">
                                 <p>Version 1.0.0</p>
