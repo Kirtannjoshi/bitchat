@@ -32,7 +32,7 @@ const haptic = {
 const SiriWaveform = ({ analyser }: { analyser: AnalyserNode | null }) => {
     const meshRef = useRef<THREE.Mesh>(null);
     const geometryRef = useRef<THREE.BufferGeometry>(null);
-    
+
     const barCount = 64;
     const positions = new Float32Array(barCount * 18);
     const dataArray = new Uint8Array(barCount);
@@ -49,27 +49,27 @@ const SiriWaveform = ({ analyser }: { analyser: AnalyserNode | null }) => {
             const width = 0.1;
 
             const idx = i * 18;
-            
+
             positions[idx] = x - width / 2;
             positions[idx + 1] = -height / 2;
             positions[idx + 2] = 0;
-            
+
             positions[idx + 3] = x + width / 2;
             positions[idx + 4] = -height / 2;
             positions[idx + 5] = 0;
-            
+
             positions[idx + 6] = x + width / 2;
             positions[idx + 7] = height / 2;
             positions[idx + 8] = 0;
-            
+
             positions[idx + 9] = x - width / 2;
             positions[idx + 10] = -height / 2;
             positions[idx + 11] = 0;
-            
+
             positions[idx + 12] = x + width / 2;
             positions[idx + 13] = height / 2;
             positions[idx + 14] = 0;
-            
+
             positions[idx + 15] = x - width / 2;
             positions[idx + 16] = height / 2;
             positions[idx + 17] = 0;
@@ -81,15 +81,8 @@ const SiriWaveform = ({ analyser }: { analyser: AnalyserNode | null }) => {
 
     return (
         <mesh ref={meshRef}>
-            <bufferGeometry ref={geometryRef}>
-                <bufferAttribute
-                    attach="attributes-position"
-                    count={barCount * 6}
-                    array={positions}
-                    itemSize={3}
-                />
-            </bufferGeometry>
-            <meshStandardMaterial 
+            <bufferGeometry ref={geometryRef} />
+            <meshStandardMaterial
                 color="#ffffff"
                 roughness={0.3}
                 metalness={0.7}
@@ -322,7 +315,7 @@ const App = () => {
                         <Canvas camera={{ position: [0, 0, 8], fov: 50 }}>
                             <ambientLight intensity={0.8} />
                             <pointLight position={[10, 10, 10]} intensity={1} />
-                            <SiriWaveform 
+                            <SiriWaveform
                                 analyser={isTransmitting ? localAnalyserRef.current : remoteAnalyserRef.current}
                             />
                         </Canvas>
@@ -355,26 +348,22 @@ const App = () => {
                             onMouseDown={() => togglePTT(true)}
                             onMouseUp={() => togglePTT(false)}
                             disabled={!isConnected}
-                            className={`relative w-24 h-24 transition-all duration-200 ${
-                                !isConnected ? 'opacity-30' : isTransmitting ? 'scale-90' : 'scale-100'
-                            }`}
+                            className={`relative w-24 h-24 transition-all duration-200 ${!isConnected ? 'opacity-30' : isTransmitting ? 'scale-90' : 'scale-100'
+                                }`}
                         >
-                            <div className={`absolute inset-0 rounded-full border-[5px] ${
-                                isConnected ? 'border-white' : 'border-white/30'
-                            }`}></div>
-                            <div className={`absolute inset-[10px] rounded-full ${
-                                isTransmitting ? 'bg-white' : isConnected ? 'bg-white' : 'bg-white/20'
-                            }`}></div>
+                            <div className={`absolute inset-0 rounded-full border-[5px] ${isConnected ? 'border-white' : 'border-white/30'
+                                }`}></div>
+                            <div className={`absolute inset-[10px] rounded-full ${isTransmitting ? 'bg-white' : isConnected ? 'bg-white' : 'bg-white/20'
+                                }`}></div>
                         </button>
                     </div>
 
                     <button
                         onClick={connectToFrequency}
-                        className={`w-full py-5 rounded-full font-bold text-lg transition-all ${
-                            isConnected 
-                                ? 'bg-white/10 text-white border-2 border-white/30' 
+                        className={`w-full py-5 rounded-full font-bold text-lg transition-all ${isConnected
+                                ? 'bg-white/10 text-white border-2 border-white/30'
                                 : 'bg-white text-black'
-                        }`}
+                            }`}
                     >
                         {isConnected ? 'Disconnect' : 'Connect'}
                     </button>
